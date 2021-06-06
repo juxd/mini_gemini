@@ -1,0 +1,5 @@
+(executable
+ ; (public_name mini_gemini)
+ (name main)
+ (libraries base stdio mini_gemini ssl)
+ (preprocess (pps ppx_let ppx_inline_test ppx_sexp_message)))
