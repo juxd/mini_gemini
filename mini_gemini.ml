@@ -43,6 +43,7 @@ let get raw_url ~certs_dir =
   | Ok sockaddr ->
     Ssl.init ();
     let context = Ssl.create_context Ssl.TLSv1_3 Ssl.Client_context in
+    if not (Caml.Sys.file_exists certs_dir) then Caml.Sys.mkdir certs_dir 755;
     let certfile = certs_dir ^ Uri.host_with_default uri ^ ".pem" in
     let visited_before = Caml.Sys.file_exists certfile in
     let socket =
@@ -70,9 +71,9 @@ let get raw_url ~certs_dir =
 ;;
 
 let () =
-  let usage_msg = (Sys.get_argv ()).(0) ^ "[-certsdir CERTSDIR] location" in
+  let usage_msg = (Sys.get_argv ()).(0) ^ " [-certsdir CERTSDIR] location" in
   let link : string option ref = ref None in
-  let certs_dir = ref "~/.mini_gemini_certs" in
+  let certs_dir = ref (Unix.getenv "HOME" ^ "/.mini_gemini_certs/") in
   let anon_fun url =
     match !link with
     | Some _addr -> ()
@@ -81,8 +82,9 @@ let () =
   Caml.Arg.parse
     [ ( "-certsdir"
       , Caml.Arg.Set_string certs_dir
-      , "Directory to store and retrieve certificates. Defaults to ~/.mini_gemini_certs \
-         if not provided" )
+      , "Directory to store and retrieve certificates. Defaults to "
+        ^ Unix.getenv "HOME"
+        ^ "/.mini_gemini_certs if not provided" )
     ]
     anon_fun
     usage_msg;
