@@ -37,13 +37,31 @@ let collect_until_closed socket =
   collect socket buffer bytes
 ;;
 
-let get raw_url =
+let get raw_url ~certs_dir =
   let uri = Uri.of_string raw_url in
   match inet_address_of uri with
   | Ok sockaddr ->
     Ssl.init ();
-    let socket = Ssl.open_connection Ssl.TLSv1_3 sockaddr in
-    Stdio.print_endline "SSL connection ok.";
+    let context = Ssl.create_context Ssl.TLSv1_3 Ssl.Client_context in
+    let certfile = certs_dir ^ Uri.host_with_default uri ^ ".pem" in
+    let visited_before = Caml.Sys.file_exists certfile in
+    let socket =
+      if visited_before
+      then (
+        Stdio.printf "Loading SSL certificate at file %s\n" certfile;
+        Ssl.load_verify_locations context certfile "";
+        let socket = Ssl.open_connection_with_context context sockaddr in
+        Ssl.verify socket;
+        Ssl.get_verify_result socket |> Ssl.get_verify_error_string |> Stdio.print_endline;
+        socket)
+      else (
+        Stdio.printf
+          "First time visiting this address, will save SSL certificate in %s\n"
+          certfile;
+        let socket = Ssl.open_connection_with_context context sockaddr in
+        Ssl.write_certificate certfile (Ssl.get_certificate socket);
+        socket)
+    in
     Stdio.print_endline "sending request...";
     Ssl.output_string socket (Printf.sprintf "%s\r\n" (Uri.to_string uri));
     Ssl.flush socket;
@@ -52,15 +70,23 @@ let get raw_url =
 ;;
 
 let () =
-  let usage_msg = (Sys.get_argv ()).(0) ^ " location" in
+  let usage_msg = (Sys.get_argv ()).(0) ^ "[-certsdir CERTSDIR] location" in
   let link : string option ref = ref None in
+  let certs_dir = ref "~/.mini_gemini_certs" in
   let anon_fun url =
     match !link with
     | Some _addr -> ()
     | None -> link := Some url
   in
-  Caml.Arg.parse [] anon_fun usage_msg;
+  Caml.Arg.parse
+    [ ( "-certsdir"
+      , Caml.Arg.Set_string certs_dir
+      , "Directory to store and retrieve certificates. Defaults to ~/.mini_gemini_certs \
+         if not provided" )
+    ]
+    anon_fun
+    usage_msg;
   match !link with
   | None -> Caml.Arg.usage [] usage_msg
-  | Some addr -> get addr
+  | Some addr -> get addr ~certs_dir:!certs_dir
 ;;
