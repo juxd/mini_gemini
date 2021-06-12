@@ -1,4 +1,0 @@
-(library
- (name mini_gemini)
- (libraries ssl base)
- (inline_tests))
