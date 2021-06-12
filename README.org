@@ -1,0 +1,3 @@
+#+TITLE: mini_gemini
+
+A toy gemini client written in OCaml, with simple TOFU SSL authentication.
